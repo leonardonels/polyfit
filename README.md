@@ -1,9 +1,15 @@
 # polyfit
 
-This is a stand alone C++ program to fit a curve with a polynomial.
+This is a standalone C++ program to fit a curve with a polynomial.
 
-To compile: g++ -o Polyfit Polyfit.cpp
-
+> To compile: 
+```commandline
+g++ -o build/Polyfit src/Polyfit.cpp
+```
+> To run:
+```commandline
+./build/Polyfit vallelunga_x_y_r_v.csv
+```
 Inputs:
 
 k: Degree of the polynomial

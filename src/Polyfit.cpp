@@ -35,14 +35,18 @@
 #include <math.h>
 #include <cmath>
 #include <iomanip>
+#include <random>
+
+#include <algorithm>
+#include <sstream>
+#include <cstdlib>
+#include <cstring>
 
 using namespace std;
 
 #define MAXIT 100
 #define EPS 3.0e-7
 #define FPMIN 1.0e-30
-
-
 
 /*
  * zlib License
@@ -71,6 +75,64 @@ using namespace std;
 
 #define STOP 1.0e-8
 #define TINY 1.0e-30
+
+// Function to compute the derivative of the polynomial at a given x
+// **************************************************************
+double polynomial_derivative(double x, const double coef[], size_t k) {
+    double derivative = 0.0;
+    for (size_t i = 1; i <= k; ++i) {
+        derivative += i * coef[i] * std::pow(x, i - 1);  // Polynomial derivative
+    }
+    return derivative;
+}
+
+// Functions to plot using GNUplot
+// **************************************************************
+void plot_data_and_polynomial(const std::vector<double>& x_values, const std::vector<double>& y_values, const double coef[], size_t k) {
+    // Check if x_values and y_values are not empty
+    if (x_values.empty() || y_values.empty()) {
+        std::cerr << "Error: x_values or y_values are empty!" << std::endl;
+        return;
+    }
+
+    // Open a pipe to GNUplot
+    FILE* gnuplot = popen("gnuplot -persistent", "w");
+    if (!gnuplot) {
+        std::cerr << "Error: Could not open GNUplot!" << std::endl;
+        return;
+    }
+
+    // Set plot options
+    fprintf(gnuplot, "set title 'Polynomial Fit'\n");
+    fprintf(gnuplot, "set xlabel 'X'\n");
+    fprintf(gnuplot, "set ylabel 'Y'\n");
+
+    // Plot the data points and the polynomial curve
+    fprintf(gnuplot, "plot '-' using 1:2 with points title 'Data Points', ");
+
+    // Polynomial fit (using direct data points in the script)
+    fprintf(gnuplot, "'-' using 1:2 with lines title 'Polynomial Fit'\n");
+
+    // Provide the data directly to gnuplot for the data points
+    for (size_t i = 0; i < x_values.size(); ++i) {
+        fprintf(gnuplot, "%f %f\n", x_values[i], y_values[i]);
+    }
+    fprintf(gnuplot, "e\n");  // End of data for points
+
+    // Polynomial curve (generated from the coefficients)
+    for (double x = *std::min_element(x_values.begin(), x_values.end()); x <= *std::max_element(x_values.begin(), x_values.end()); x += 0.1) {
+        double y = 0;
+        for (size_t i = 0; i <= k; ++i) {
+            y += coef[i] * std::pow(x, i);
+        }
+        fprintf(gnuplot, "%f %f\n", x, y);
+    }
+    fprintf(gnuplot, "e\n");  // End of data for polynomial curve
+
+    // Close the gnuplot pipe
+    fclose(gnuplot);
+}
+
 
  // Adapted from https://github.com/codeplea/incbeta
 double incbeta(double a, double b, double x) {
@@ -176,7 +238,6 @@ double invincbeta(double y, double alpha, double beta) {
 
 
 }
-
 
 
 // Calculate the t value for a Student distribution
@@ -785,7 +846,12 @@ void DisplayCovCorrMatrix(const size_t k, const double sigma, const bool fixed, 
 
 // The main program
 // **************************************************************
-int main() {
+int main(int argc, char* argv[]) {
+
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <input file>\n";
+        return 1;
+    }
 
     cout << "Polynomial fit!" << endl;
 
@@ -797,52 +863,64 @@ int main() {
     double fixedinterval = 0.;                       // The fixed intercept value (if applicable)
     double alphaval = 0.05;                          // Critical apha value
 
-    double y[] = { 372.5895394992980000,
-        362.6829307301930000,
-        352.8964341410370000,
-        342.9849465086840000,
-        333.1500000000000000,
-        323.2649378847740000,
-        318.2448396259870000,
-        313.2185606427880000,
-        308.1957515192810000,
-        303.1842291524820000,
-        298.1798900853420000,
-        293.1500000000000000,
-        288.1752611817910000,
-        283.1820233830050000,
-        278.1811607406190000,
-        273.1771073448810000,
-        268.1520062413440000,
-        263.1434768657250000,
-        258.1500000000000000,
-        253.1637810736190000,
-        243.2058392881070000,
-        233.2698723846240000,
-    };
-    double x[] = { 177.00,
-        241.00,
-        332.00,
-        467.00,
-        667.00,
-        973.00,
-        1188.00,
-        1459.00,
-        1802.00,
-        2238.00,
-        2796.00,
-        3520.00,
-        4450.00,
-        5670.00,
-        7280.00,
-        9420.00,
-        12300.00,
-        16180.00,
-        21450.00,
-        28680.00,
-        52700.00,
-        100700.00,
-    };
+    // Custom datapoints from csv file
+    // **************************************************************
+    std::ifstream input(argv[1]);
+    if (!input) {
+        perror("Error opening input file");
+        return 1;
+    }
+
+    std::string line;
+    std::vector<double> x_values, y_values;
+    double *x, *y;
+
+    // double y[] = { 372.5895394992980000,
+    //     362.6829307301930000,
+    //     352.8964341410370000,
+    //     342.9849465086840000,
+    //     333.1500000000000000,
+    //     323.2649378847740000,
+    //     318.2448396259870000,
+    //     313.2185606427880000,
+    //     308.1957515192810000,
+    //     303.1842291524820000,
+    //     298.1798900853420000,
+    //     293.1500000000000000,
+    //     288.1752611817910000,
+    //     283.1820233830050000,
+    //     278.1811607406190000,
+    //     273.1771073448810000,
+    //     268.1520062413440000,
+    //     263.1434768657250000,
+    //     258.1500000000000000,
+    //     253.1637810736190000,
+    //     243.2058392881070000,
+    //     233.2698723846240000,
+    // };
+    // double x[] = { 177.00,
+    //     241.00,
+    //     332.00,
+    //     467.00,
+    //     667.00,
+    //     973.00,
+    //     1188.00,
+    //     1459.00,
+    //     1802.00,
+    //     2238.00,
+    //     2796.00,
+    //     3520.00,
+    //     4450.00,
+    //     5670.00,
+    //     7280.00,
+    //     9420.00,
+    //     12300.00,
+    //     16180.00,
+    //     21450.00,
+    //     28680.00,
+    //     52700.00,
+    //     100700.00,
+    // };
     double erry[] = {};       // Data points (err on y) (if applicable)
 
     // Definition of other variables
@@ -860,7 +938,34 @@ int main() {
 
     // Initialize values
     // **************************************************************
-    n = sizeof(x) / sizeof(double);
+    std::getline(input, line); // Skip the header
+
+    while (std::getline(input, line)) {
+        std::istringstream ss(line);
+        std::string token;
+        std::vector<double> values;
+        while (std::getline(ss, token, ',')) {
+            values.push_back(std::stod(token));
+        }
+        if (values.size() >= 4) {
+            double csv_x = values[0];
+            double csv_y = values[1];
+            double R_c = values[2];
+            double V_target = values[3];
+            x_values.push_back(csv_x);
+            y_values.push_back(csv_y);
+            // std::cout << csv_x << " " << csv_y << " " << R_c << " " << V_target << std::endl;
+        }
+    }
+
+    // Convert vectors to arrays
+    x = (double*)malloc(x_values.size() * sizeof(double));
+    y = (double*)malloc(y_values.size() * sizeof(double));
+    std::copy(x_values.begin(), x_values.end(), x);
+    std::copy(y_values.begin(), y_values.end(), y);
+    n = x_values.size();
+
+    //n = sizeof(x) / sizeof(double);
     nstar = n - 1;
     if (fixedinter) nstar = n;
 
@@ -892,8 +997,8 @@ int main() {
     // **************************************************************
     CalculateWeights(erry, Weights, n, wtype);
 
-    cout << "Weights" << endl;
-    displayMat(Weights, n, n);
+    //cout << "Weights" << endl;    // Matrix too big to display
+    //displayMat(Weights, n, n);
 
     if (determinant(Weights, n) == 0.) {
         cout << "One or more points have 0 error. Review the errors on points or use no weighting. ";
@@ -949,6 +1054,19 @@ int main() {
 
     Free2DArray(XTWXInv, k + 1);
     Free2DArray(Weights, n);
+
+    // Calculate the derivative of the polynomial at x = 0
+    // **************************************************************
+    // Generate a random x-coordinate for testing derivative
+    srandom(time(NULL));
+    size_t random_index = random() % x_values.size();  // Random index in the range [0, x_values.size()-1]
+    double x_random = x_values[random_index];  // Random x from x_values
+
+    double derivative = polynomial_derivative(x_random, coefbeta, k);
+
+    std::cout << "\nDerivative of polynomial at x = " << x_random << " is: " << derivative << std::endl;
+
+    plot_data_and_polynomial(x_values, y_values, coefbeta, k);
 
 }
 
