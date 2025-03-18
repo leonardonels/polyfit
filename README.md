@@ -4,6 +4,7 @@ This is a standalone C++ program to fit a curve with a polynomial.
 
 > To compile: 
 ```commandline
+sudo apt-get install gnuplot
 g++ -o build/Polyfit src/Polyfit.cpp
 ```
 > To run:
