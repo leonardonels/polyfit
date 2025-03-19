@@ -6,7 +6,7 @@
 // * KBR                                                              *
 // * 2400 NASA Parkway, Houston, TX 77058                             *
 // * Ianik.Plante-1@nasa.gov                                          *
-// *                                                                  *
+// *            A                                                      *
 // * This code is used to fit a series of n points with a polynomial  *
 // * of degree k, and calculation of error bars on the coefficients.  *
 // * If error is provided on the y values, it is possible to use a    *
